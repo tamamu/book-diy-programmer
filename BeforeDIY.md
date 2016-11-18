@@ -20,6 +20,13 @@ Python3は既にインストールされているものとして、まずはGTK+
 $ sudo apt-get install libgtk-3-dev python3-gi
 ```
 
+macOSの方は以下の作業を行ってください。
+
+```bash
+$ brew install gtk+3
+$ brew reinstall pygobject3 --with-python3
+```
+
 Windowsの方は[PyGObjectのページ](https://wiki.gnome.org/Projects/PyGObject)の**Windows installers with Gtk3 support**というところからインストーラをダウンロードします。  
 あとはインストーラの手順に従い、インストールしたいライブラリを選択するところで、「GStreamer」「GTK+」「GTKSourceView」「Webkit2GTK」にチェックを入れてインストールしてください。
 ※Windows版のPython3.5には対応していないようなので、既に3.5が入っている方は3.4をインストールし直すか、別のツールキットを利用してください。
