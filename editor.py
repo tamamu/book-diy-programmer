@@ -1,4 +1,6 @@
+import os
 import sys
+
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('GtkSource', '3.0')
@@ -12,16 +14,24 @@ MENU_XML = """
       <attribute name="label" translatable="yes">ファイル</attribute>
       <section>
         <item>
-          <attribute name="action">win.open_file</attribute>
+          <attribute name="action">win.open</attribute>
           <attribute name="label" translatable="yes">開く</attribute>
+          <attribute name="icon">document-open</attribute>
         </item>
         <item>
-          <attribute name="action">win.save_with_name</attribute>
+          <attribute name="action">win.save</attribute>
+          <attribute name="label" translatable="yes">上書き保存</attribute>
+          <attribute name="icon">document-save</attribute>
+        </item>
+        <item>
+          <attribute name="action">win.save_as</attribute>
           <attribute name="label" translatable="yes">名前を付けて保存</attribute>
+          <attribute name="icon">document-save-as</attribute>
         </item>
         <item>
           <attribute name="action">win.quit</attribute>
           <attribute name="label" translatable="yes">終了</attribute>
+          <attribute name="icon">application-exit</attribute>
         </item>
       </section>
     </submenu>
@@ -37,7 +47,7 @@ class Application(Gtk.Application):
 #                        flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
                          flags=Gio.ApplicationFlags.FLAGS_NONE,
                          **kwargs)
-        self.window = None
+        self.win = None
 #        self.activate()
 
 #        self.add_main_option("open", ord("o"), GLib.OptionFlags.NONE,
@@ -59,13 +69,30 @@ class Application(Gtk.Application):
         self.set_menubar(builder.get_object("menubar"))
 
     def do_activate(self):
-        if not self.window:
-            self.window = EditorWindow(application=self,
-                                       title="DIY Editor")
+        if not self.win:
+            self.win = EditorWindow(application=self,
+                                    title="DIY Editor")
+            action = Gio.SimpleAction.new("open", None)
+            action.connect("activate", self.win.on_open)
+            self.win.add_action(action)
+            self.add_accelerator('<Primary>O', 'win.open', None)
 
-        self.window.present()
+            action = Gio.SimpleAction.new("save", None)
+            action.connect("activate", self.win.on_save)
+            self.win.add_action(action)
+            self.add_accelerator('<Primary>S', 'win.save', None)
 
+            action = Gio.SimpleAction.new("save_as", None)
+            action.connect("activate", self.win.on_save_as)
+            self.win.add_action(action)
+            self.add_accelerator('<Primary><Shift>S', 'win.save_as', None)
 
+            action = Gio.SimpleAction.new("quit", None)
+            action.connect("activate", self.win.on_quit)
+            self.win.add_action(action)
+            self.add_accelerator('<Primary>Q', 'win.quit', None)
+
+        self.win.present()
 
 
 class EditorWindow(Gtk.ApplicationWindow):
@@ -75,24 +102,21 @@ class EditorWindow(Gtk.ApplicationWindow):
 
         self.set_default_size(640, 480)
 
+        self.__sw = Gtk.ScrolledWindow()
+        self.__sw.set_hexpand(True)
+        self.__sw.set_vexpand(True)
+
         self.buffer = GtkSource.Buffer()
         self.editor = GtkSource.View.new_with_buffer(self.buffer)
+        self.path = ""
 
         lang_manager = GtkSource.LanguageManager()
         self.buffer.set_language(lang_manager.get_language('python'))
-        self.add(self.editor)
-        self.editor.show()
+        self.__sw.add(self.editor)
+        self.add(self.__sw)
+        self.show_all()
 
-        action = Gio.SimpleAction.new_stateful("open_file", None,
-                                               GLib.Variant.new_boolean(False))
-        action.connect("activate", self.on_open_file)
-        self.add_action(action)
-
-        action = Gio.SimpleAction.new("save_with_name", None)
-        action.connect("activate", self.on_save_with_name)
-        self.add_action(action)
-
-    def on_open_file(self, action, param):
+    def on_open(self, action, param):
         dialog = Gtk.FileChooserDialog("ファイルを選択", self,
                                        Gtk.FileChooserAction.OPEN,
                                        (Gtk.STOCK_CANCEL,
@@ -100,23 +124,40 @@ class EditorWindow(Gtk.ApplicationWindow):
                                         Gtk.STOCK_OPEN,
                                         Gtk.ResponseType.OK))
 
-        filter_any = Gtk.FileFilter()
-        filter_any.set_name("Any files")
-        filter_any.add_pattern("*")
-        dialog.add_filter(filter_any)
-
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
-            f = GtkSource.File.new()
-            f.set_location(dialog.get_file())
-            loader = GtkSource.FileLoader().new(self.buffer, f)
-            loader.load_async(GLib.PRIORITY_DEFAULT,
-                              None,
-                              None, None, None, None)
+            self.path = dialog.get_filename()
+            if self.path:
+                if not os.path.isabs(self.path):
+                    self.path = os.path.abspath(self.path)
+            dialog.destroy()
 
-        dialog.destroy()
+            ENC = None
+            self.buffer.begin_not_undoable_action()
+            for enc in ("iso-2022-jp", "euc-jp", "sjis", "utf-8"):
+                with open(self.path, encoding=enc) as f:
+                    try:
+                        f.read()
+                    except UnicodeDecodeError:
+                        continue
+                ENC = enc
 
-    def on_save_with_name(self, action, param):
+            if ENC:
+                with open(self.path, "Ur", encoding=ENC) as f:
+                    source = f.read()
+                self.buffer.set_text(source)
+                self.buffer.end_not_undoable_action()
+                self.buffer.set_modified(False)
+                self.buffer.place_cursor(self.buffer.get_start_iter())
+            else:
+                dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.ERROR,
+                                           Gtk.ButtonsType.OK, "File Open Error")
+                dialog.format_secondary_text(
+                    "Cannot open: %r" % self.path)
+                dialog.run()
+                dialog.destroy()
+
+    def save_as(self):
         dialog = Gtk.FileChooserDialog("名前を付けて保存", self,
                                        Gtk.FileChooserAction.SAVE,
                                        (Gtk.STOCK_CANCEL,
@@ -126,13 +167,31 @@ class EditorWindow(Gtk.ApplicationWindow):
 
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
-            f = GtkSource.File.new()
-            f.set_location(dialog.get_file())
-            saver = GtkSource.FileSaver().new(self.buffer, f)
-            saver.save_async(GLib.PRIORITY_DEFAULT,
-                             None, None, None, None, None)
+            self.path = dialog.get_filename()
+            source = self.buffer.get_text(self.buffer.get_start_iter(),
+                                          self.buffer.get_end_iter())
+            f = open(self.path, "w")
+            f.write(source)
+            f.close()
 
         dialog.destroy()
+
+    def on_save(self, action, param):
+        if self.path != "":
+            source = self.buffer.get_text(self.buffer.get_start_iter(),
+                                          self.buffer.get_end_iter(),
+                                          True)
+            f = open(self.path, "w")
+            f.write(source)
+            f.close()
+        else:
+            self.save_as()
+
+    def on_save_as(self, action, param):
+        self.save_as()
+
+    def on_quit(self, action, param):
+        self.close()
 
 if __name__ == "__main__":
     app = Application()
