@@ -127,13 +127,11 @@ class EditorWindow(Gtk.ApplicationWindow):
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
             self.path = dialog.get_filename()
-            if self.path:
-                if not os.path.isabs(self.path):
-                    self.path = os.path.abspath(self.path)
+            if not os.path.isabs(self.path):
+                self.path = os.path.abspath(self.path)
             dialog.destroy()
 
             ENC = None
-            self.buffer.begin_not_undoable_action()
             for enc in ("iso-2022-jp", "euc-jp", "sjis", "utf-8"):
                 with open(self.path, encoding=enc) as f:
                     try:
@@ -145,6 +143,7 @@ class EditorWindow(Gtk.ApplicationWindow):
             if ENC:
                 with open(self.path, "Ur", encoding=ENC) as f:
                     source = f.read()
+                self.buffer.begin_not_undoable_action()
                 self.buffer.set_text(source)
                 self.buffer.end_not_undoable_action()
                 self.buffer.set_modified(False)
@@ -156,6 +155,8 @@ class EditorWindow(Gtk.ApplicationWindow):
                     "Cannot open: %r" % self.path)
                 dialog.run()
                 dialog.destroy()
+        else:
+            dialog.destroy()
 
     def save_as(self):
         dialog = Gtk.FileChooserDialog("名前を付けて保存", self,
