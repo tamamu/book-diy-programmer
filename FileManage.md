@@ -58,9 +58,11 @@ def do_activate(self):
 
 ```python
 self.path = ""
+self.filename = "Untitled"
 ```
 
-これは編集中のファイルのパスを格納しておくために使います。  
+これは編集中のファイルのパスとファイル名を格納しておくために使います。  
+ここで定義した`self.filename`が仮のファイル名として表示に使われます。  
 次に、以下のメソッドを`EditorWindow`クラスに追加してください。  
 `on_save_as`メソッドとは別なので注意を。
 
@@ -74,16 +76,23 @@ def save_as(self):
                                     Gtk.ResponseType.OK))
 
     response = dialog.run()
+    result = False
     if response == Gtk.ResponseType.OK:
         self.path = dialog.get_filename()
+        if not os.path.isabs(self.path):
+            self.path = os.path.abspath(self.path)
+        self.filename = os.path.basename(self.path)
         source = self.buffer.get_text(self.buffer.get_start_iter(),
                                       self.buffer.get_end_iter(),
                                       True)
         f = open(self.path, "w")
         f.write(source)
         f.close()
+        self.buffer.set_modified(False)
+        result = True
 
     dialog.destroy()
+    return result
 ```
 
 `dialog = Gtk.FileChooserDialog(...)`でファイル選択ダイアログを生成して`dialog`に格納しています。  
@@ -138,7 +147,7 @@ def on_save_as(self, action, param):
 もし`self.path`が空だったら`名前を付けて保存`と同じ動作をさせます。
 
 ```python
-def on_save(self, action, param):
+def save(self):
     if self.path != "":
         source = self.buffer.get_text(self.buffer.get_start_iter(),
                                       self.buffer.get_end_iter(),
@@ -146,8 +155,13 @@ def on_save(self, action, param):
         f = open(self.path, "w")
         f.write(source)
         f.close()
+        self.buffer.set_modified(False)
+        return True
     else:
-        self.save_as()
+        return self.save_as()
+
+def on_save(self, action, param):
+    self.save()
 ```
 
 最後に`Application`クラスの`do_activate`メソッドでアクションを追加するのを忘れずに。
@@ -179,6 +193,7 @@ def on_open(self, action, param):
         self.path = dialog.get_filename()
         if not os.path.isabs(self.path):
             self.path = os.path.abspath(self.path)
+        self.filename = os.path.basename(self.path)
         dialog.destroy()
 
         ENC = None
@@ -221,4 +236,4 @@ def on_open(self, action, param):
 
 以上でファイルの入出力が出来るようになりました！  
 変更済みのファイルの保存を促したりはしてくれませんが、コードを書くには十分な出来です。  
-次の頁ではその部分と、仕様の残りの項目を実装していきます。
+次の頁ではその部分を実装していきます。
