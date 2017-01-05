@@ -108,7 +108,9 @@ class EditorWindow(Gtk.ApplicationWindow):
 
         self.buffer = GtkSource.Buffer()
         self.editor = GtkSource.View.new_with_buffer(self.buffer)
+        self.editor.set_show_line_numbers(True)
         self.path = ""
+        self.filename = "Untitled"
 
         lang_manager = GtkSource.LanguageManager()
         self.buffer.set_language(lang_manager.get_language('python'))
@@ -117,6 +119,8 @@ class EditorWindow(Gtk.ApplicationWindow):
         self.show_all()
 
     def on_open(self, action, param):
+        if self.check_modified() == False:
+            return
         dialog = Gtk.FileChooserDialog("ファイルを選択", self,
                                        Gtk.FileChooserAction.OPEN,
                                        (Gtk.STOCK_CANCEL,
@@ -129,6 +133,7 @@ class EditorWindow(Gtk.ApplicationWindow):
             self.path = dialog.get_filename()
             if not os.path.isabs(self.path):
                 self.path = os.path.abspath(self.path)
+            self.filename = os.path.basename(self.path)
             dialog.destroy()
 
             ENC = None
@@ -158,6 +163,42 @@ class EditorWindow(Gtk.ApplicationWindow):
         else:
             dialog.destroy()
 
+    def check_modified(self):
+        if self.buffer.get_modified():
+            dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.QUESTION,
+                                (Gtk.STOCK_CANCEL,
+                                 Gtk.ResponseType.CANCEL,
+                                 Gtk.STOCK_NO,
+                                 Gtk.ResponseType.NO,
+                                 Gtk.STOCK_YES,
+                                 Gtk.ResponseType.YES))
+            dialog.set_markup(self.filename+"への変更を保存しますか？")
+
+            response = dialog.run()
+            result = False
+            if response == Gtk.ResponseType.NO:
+                result = True
+            elif response == Gtk.ResponseType.YES:
+                result = self.save()
+
+            dialog.destroy()
+            return result
+        else:
+            return True
+
+    def save(self):
+        if self.path != "":
+            source = self.buffer.get_text(self.buffer.get_start_iter(),
+                                          self.buffer.get_end_iter(),
+                                          True)
+            f = open(self.path, "w")
+            f.write(source)
+            f.close()
+            self.buffer.set_modified(False)
+            return True
+        else:
+            return self.save_as()
+
     def save_as(self):
         dialog = Gtk.FileChooserDialog("名前を付けて保存", self,
                                        Gtk.FileChooserAction.SAVE,
@@ -167,32 +208,33 @@ class EditorWindow(Gtk.ApplicationWindow):
                                         Gtk.ResponseType.OK))
 
         response = dialog.run()
+        result = False
         if response == Gtk.ResponseType.OK:
             self.path = dialog.get_filename()
-            source = self.buffer.get_text(self.buffer.get_start_iter(),
-                                          self.buffer.get_end_iter())
-            f = open(self.path, "w")
-            f.write(source)
-            f.close()
-
-        dialog.destroy()
-
-    def on_save(self, action, param):
-        if self.path != "":
+            if not os.path.isabs(self.path):
+                self.path = os.path.abspath(self.path)
+            self.filename = os.path.basename(self.path)
             source = self.buffer.get_text(self.buffer.get_start_iter(),
                                           self.buffer.get_end_iter(),
                                           True)
             f = open(self.path, "w")
             f.write(source)
             f.close()
-        else:
-            self.save_as()
+            self.buffer.set_modified(False)
+            result = True
+
+        dialog.destroy()
+        return result
+
+    def on_save(self, action, param):
+        self.save()
 
     def on_save_as(self, action, param):
         self.save_as()
 
     def on_quit(self, action, param):
-        self.close()
+        if self.check_modified():
+            self.close()
 
 if __name__ == "__main__":
     app = Application()

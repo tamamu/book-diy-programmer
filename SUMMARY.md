@@ -7,3 +7,4 @@
   * [テキストボックスを作る](AddEditor.md)
   * [メニューバーを作る](AddMenubar.md)
   * [ファイルを開いて、名前を付けて保存](FileManage.md)
+  * [変更を保存しますか？](SaveChanges.md)
