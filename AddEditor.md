@@ -50,16 +50,17 @@ from gi.repository import GtkSource
 
 class EditorWindow(Gtk.Window):
 
-	def __init__(self):
-		Gtk.Window.__init__(self, title="DIY Editor")
+    def __init__(self):
+        Gtk.Window.__init__(self, title="DIY Editor")
         self.set_default_size(640, 480)
 
-		self.buffer = GtkSource.Buffer()
-		self.editor = GtkSource.View.new_with_buffer(self.buffer)
+        self.buffer = GtkSource.Buffer()
+        self.editor = GtkSource.View.new_with_buffer(self.buffer)
+        self.editor.set_show_line_numbers(True)
 
-		lang_manager = GtkSource.LanguageManager()
-		self.buffer.set_language(lang_manager.get_language('python'))
-		self.add(self.editor)
+        lang_manager = GtkSource.LanguageManager()
+        self.buffer.set_language(lang_manager.get_language('python'))
+        self.add(self.editor)
 
 win = EditorWindow()
 win.connect("delete-event", Gtk.main_quit)
@@ -86,6 +87,8 @@ from gi.repository import GtkSource
 # Gtk.Text~をGtkSourceに変えた
 self.buffer = GtkSource.Buffer()
 self.editor = GtkSource.View.new_with_buffer(self.buffer)
+# 行番号を表示するように設定している
+self.editor.set_show_line_numbers(True)
 
 # ハイライトする言語を設定している
 lang_manager = GtkSource.LanguageManager()
@@ -112,7 +115,7 @@ self.buffer.set_language(lang_manager.get_language('python'))
 
 ```python
 def __init__(self):
-	Gtk.Window.__init__(self, title="DIY Editor")
+    Gtk.Window.__init__(self, title="DIY Editor")
     self.set_default_size(640, 480)
     self.buffer = GtkSource.Buffer()
     self.editor = GtkSource.View.new_with_buffer(self.buffer)
